@@ -1,3 +1,7 @@
+""""
+Uses Otsu thresholding (adapitve based on histogram assuming bi-modal distribution of pixel intensities) on blue channel to generate a black and white image. The blue channel has the best contrast between sky and other objects. Then it uses morphological erosion (expands black areas) to account for lost coverage due to fact that images are taken against the light source so edges are naturally overexposed.
+
+"""
 import glob
 import cv2
 import numpy as np
@@ -9,18 +13,15 @@ img_dir = "./data/"
 img_regex = "*.JPG"
 
 img_list = glob.glob(img_dir + img_regex)
-# print(img_list)
+
+morph_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
 
 cv2.namedWindow("input", cv2.WINDOW_GUI_EXPANDED)
-cv2.createTrackbar('d','input',15,25,nothing)
-cv2.createTrackbar('sigmaColour','input',155,255,nothing)
-cv2.namedWindow("processed", cv2.WINDOW_GUI_EXPANDED)
 cv2.namedWindow("grey", cv2.WINDOW_GUI_EXPANDED)
 cv2.namedWindow("thresholded", cv2.WINDOW_GUI_EXPANDED)
 
 
 for img_file in img_list:
-    # print('Opening: ' + img_file)
     img = cv2.imread(img_file)
     split_fname = img_file.split('.')[0:-1]
     split_fname.append("thresholded")
@@ -31,35 +32,20 @@ for img_file in img_list:
     width = img.shape[1]
     noPixels = height * width
 
-    morph_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
 
-    while(1):
-        k = cv2.waitKey(40)
-        if k == 110:
-            break
-        d = cv2.getTrackbarPos('d','input')
-        sigmaColour = cv2.getTrackbarPos('sigmaColour','input')
-        d = cv2.getTrackbarPos('d','input')
-        # img_blurred = cv2.bilateralFilter(img,d,sigmaColour,sigmaColour)
-        img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        img_grey = img[:,:,0]#Blue channel has the best contrast of colours for us
-        img_thresholded = cv2.adaptiveThreshold(img_grey,255,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY,11,2)
-        ret, img_thresholded = cv2.threshold(img_grey,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        #display:
-        # cv2.imshow("processed", img_blurred)
-        # cv2.imshow("grey", img_grey)
-        # cv2.imshow("thresholded", img_thresholded)
-        # img_thresholded_morph = cv2.morphologyEx(img_thresholded, cv2.MORPH_CLOSE, morph_kernel)
-        img_thresholded_morph = cv2.erode(img_thresholded, morph_kernel, iterations = 2)
-        img_fin = img_thresholded_morph
-        # print('Saving to: ' + img_file_out)
-        img_thresh_disp = cv2.cvtColor(img_fin, cv2.COLOR_GRAY2BGR)
-        img_pair = np.concatenate((img, img_thresh_disp), axis=1)
-        # cv2.imwrite(img_file_out,img_thresholded)
-        cv2.imwrite(img_file_out,img_pair)
-        ones = cv2.countNonZero(img_fin)
-        coverage = 100 * (1 - ones/noPixels)
-        print("{0} , {1:.2f} ".format(img_file,coverage ))
-        break;
+    img_grey = img[:,:,0]#Blue channel has the best contrast of colours for us
+    ret, img_thresholded = cv2.threshold(img_grey,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    img_thresholded_morph = cv2.erode(img_thresholded, morph_kernel, iterations = 2)
+    img_fin = img_thresholded_morph
+    img_thresh_disp = cv2.cvtColor(img_fin, cv2.COLOR_GRAY2BGR)
 
-    # depressedKey = cv2.waitKey(0)
+    #Saving pair of original and thresholded
+    img_pair = np.concatenate((img, img_thresh_disp), axis=1)
+    cv2.imwrite(img_file_out,img_pair)
+
+    #Calculate percentage of sky covered
+    ones = cv2.countNonZero(img_fin)
+    coverage = 100 * (1 - ones/noPixels)
+    print("{0} , {1:.2f} ".format(img_file,coverage ))
+
+    # depressedKey = cv2.waitKey(0) #uncomment to show images for longer time
